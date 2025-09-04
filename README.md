@@ -39,7 +39,7 @@ A comprehensive website for the Kumaraguru Model United Nations 2025 event, buil
 
 3. Start the development server:
    ```bash
-   npm run dev
+   npm run dev.
    ```
 
 The frontend will be available at `http://localhost:5173`

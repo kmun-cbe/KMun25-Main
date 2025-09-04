@@ -120,7 +120,7 @@ const Home: React.FC = () => {
               </h1>
               
               <p className="text-2xl md:text-3xl font-bold mb-8 text-[#37c9ee]">
-                26, 27 & 28 SEPTEMBER
+                26, 27 & 28 SEPTEMBER 2025
               </p>
               
               <p className="text-base md:text-lg mb-8 leading-relaxed text-gray-200 max-w-lg">
