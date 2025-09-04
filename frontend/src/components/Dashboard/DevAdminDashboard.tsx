@@ -596,7 +596,7 @@ const DevAdminDashboard: React.FC = () => {
 
   const checkSystemStatus = async () => {
     try {
-              const apiBaseUrl = import.meta.env.VITE_API_URL ;
+              const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://backend-7rnp.onrender.com';
         
         // Check database connection
         const dbResponse = await fetch(`${apiBaseUrl}/health/database`);
