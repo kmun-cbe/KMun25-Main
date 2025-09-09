@@ -1,8 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
+import userIdService from '../services/userIdService.js';
 
 
 
@@ -20,12 +19,16 @@ class AuthController {
         });
       }
 
+      // Generate custom user ID
+      const customUserId = await userIdService.generateUserId();
+
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 12);
 
       // Create user
       const user = await prisma.user.create({
         data: {
+          userId: customUserId,
           firstName,
           lastName,
           email,
@@ -128,7 +131,7 @@ class AuthController {
   async getProfile(req, res) {
     try {
       const user = await prisma.user.findUnique({
-        where: { id: req.user.userId },
+        where: { id: req.user.id },
         include: {
           registrations: true,
         },
@@ -174,7 +177,7 @@ class AuthController {
       }
 
       const updatedUser = await prisma.user.update({
-        where: { id: req.user.userId },
+        where: { id: req.user.id },
         data: {
           firstName,
           lastName,
@@ -229,7 +232,7 @@ class AuthController {
 
       // Update password
       await prisma.user.update({
-        where: { id: req.user.userId },
+        where: { id: req.user.id },
         data: { password: hashedNewPassword }
       });
 

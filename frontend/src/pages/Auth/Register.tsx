@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
-import { useFormStepScroll } from '../../hooks/useScrollToTop';
-import PaymentGateway from '../../components/Common/PaymentGateway';
+import PaymentGateway from '@/components/Common/PaymentGateway';
 import { 
   User, 
   Mail, 
@@ -16,8 +15,8 @@ import {
   AlertCircle,
   Copy
 } from 'lucide-react';
-import LoadingSpinner from '../../components/Common/LoadingSpinner';
-import { committeesAPI, pricingAPI } from '../../services/api';
+import LoadingSpinner from '@/components/Common/LoadingSpinner';
+import { committeesAPI, pricingAPI, registrationAPI } from '@/services/api';
 
 interface Committee {
   id: string;
@@ -87,6 +86,8 @@ const Register: React.FC = () => {
   const [pricing, setPricing] = useState<PricingData | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [registrationData, setRegistrationData] = useState<any>(null);
+  const [selectedIdDocument, setSelectedIdDocument] = useState<File | null>(null);
+  const [selectedMunResume, setSelectedMunResume] = useState<File | null>(null);
   const navigate = useNavigate();
 
   const {
@@ -165,6 +166,16 @@ const Register: React.FC = () => {
     return committee ? (committee.portfolios?.filter(p => p.isActive).map(p => p.name) || []) : [];
   };
 
+  const handleIdDocumentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setSelectedIdDocument(file);
+  };
+
+  const handleMunResumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setSelectedMunResume(file);
+  };
+
   const onSubmit = async (data: RegistrationForm) => {
     const loadingToast = toast.loading('Submitting registration...');
     setLoading(true);
@@ -175,16 +186,32 @@ const Register: React.FC = () => {
       // Create FormData for file uploads
       const formData = new FormData();
       
-      // Add all form fields
+      // Add all form fields with proper data transformation
       Object.keys(data).forEach(key => {
         if (key === 'idDocument' && data.idDocument && data.idDocument[0]) {
           formData.append('idDocument', data.idDocument[0]);
         } else if (key === 'munResume' && data.munResume && data.munResume[0]) {
           formData.append('munResume', data.munResume[0]);
         } else if (key !== 'terms' && key !== 'idDocument' && key !== 'munResume') {
-          formData.append(key, data[key as keyof RegistrationForm] as string);
+          let value = data[key as keyof RegistrationForm] as string;
+          
+          // Transform gender to uppercase for backend validation
+          if (key === 'gender') {
+            value = value.toUpperCase();
+          }
+          
+          // Ensure value is not undefined or null
+          if (value !== undefined && value !== null) {
+            formData.append(key, value);
+          }
         }
       });
+      
+      // Debug: Log FormData contents
+      console.log('FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
       
       // Call the registration API
       const response = await registrationAPI.create(formData);
@@ -193,8 +220,20 @@ const Register: React.FC = () => {
         toast.success('Registration submitted successfully!', { id: loadingToast });
         setLoading(false);
         
+        // Store the authentication token for payment API calls
+        if (response.token) {
+          localStorage.setItem('munToken', response.token);
+        }
+        
         // Store registration data and show payment gateway
-        setRegistrationData(response.registration);
+        const registrationWithUserId = {
+          ...response.registration,
+          userId: response.user.id,
+          customUserId: response.user.userId
+        };
+        console.log('Setting registration data:', registrationWithUserId);
+        console.log('Pricing data:', pricing);
+        setRegistrationData(registrationWithUserId);
         setShowPayment(true);
       } else {
         throw new Error(response.message || 'Registration failed');
@@ -213,7 +252,7 @@ const Register: React.FC = () => {
     
     // Show user credentials after a delay
     setTimeout(() => {
-      toast.success(`Registration ID: ${registrationData.id}. Check your email for login credentials.`, {
+      toast.success(`Registration successful! Your User ID: ${registrationData.customUserId}. Check your email for login credentials.`, {
         duration: 8000,
       });
       navigate('/login');
@@ -228,7 +267,7 @@ const Register: React.FC = () => {
 
   const handlePaymentClose = () => {
     setShowPayment(false);
-    toast.info('Payment cancelled. You can complete payment later from your dashboard.');
+    toast('Payment cancelled. You can complete payment later from your dashboard.');
   };
 
   const nextStep = async () => {
@@ -242,8 +281,19 @@ const Register: React.FC = () => {
     setStep(step - 1);
   };
 
-  // Scroll to top when step changes
-  useFormStepScroll(step, '.registration-form-container');
+  // Scroll to top when step changes (only on actual step changes, not on every render)
+  useEffect(() => {
+    // Only scroll if we're not on step 1 (to avoid scrolling on initial load)
+    if (step > 1) {
+      const element = document.querySelector('.registration-form-container');
+      if (element) {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }
+  }, [step]); // Only trigger when step changes
 
   if (submitted) {
     return (
@@ -514,7 +564,6 @@ const Register: React.FC = () => {
                         <option value="">Select institution type</option>
                         <option value="school">School</option>
                         <option value="college">College</option>
-                        <option value="both">Both School & College</option>
                       </select>
                       {errors.institutionType && (
                         <p className="mt-1 text-sm text-red-600">{errors.institutionType.message}</p>
@@ -719,7 +768,7 @@ const Register: React.FC = () => {
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                             >
                               <option value="">Select a portfolio</option>
-                              {getPortfoliosForCommittee(watch(`committeePreference${num}` as keyof RegistrationForm) || '').map((portfolio) => (
+                              {getPortfoliosForCommittee(String(watch(`committeePreference${num}` as keyof RegistrationForm) || '')).map((portfolio) => (
                                 <option key={portfolio} value={portfolio}>
                                   {portfolio}
                                 </option>
@@ -760,22 +809,51 @@ const Register: React.FC = () => {
                   <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-blue-400 transition-colors">
                     <div className="space-y-1 text-center">
                       <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="flex text-sm text-gray-600">
-                        <label
-                          htmlFor="id-upload"
-                          className="relative cursor-pointer bg-white rounded-md font-medium text-blue-800 hover:text-blue-900 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-                        >
-                          <span>Upload a file</span>
-                          <input
-                            id="id-upload"
-                            {...register('idDocument', { required: 'ID document is required' })}
-                            type="file"
-                            accept="image/*,.pdf"
-                            className="sr-only"
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
+                      {selectedIdDocument ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-center space-x-2">
+                            <Check className="h-5 w-5 text-green-500" />
+                            <span className="text-sm font-medium text-green-700">
+                              {selectedIdDocument.name}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {(selectedIdDocument.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                          <label
+                            htmlFor="id-upload-change"
+                            className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                          >
+                            Change file
+                            <input
+                              id="id-upload-change"
+                              {...register('idDocument', { required: 'ID document is required' })}
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="sr-only"
+                              onChange={handleIdDocumentChange}
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="flex text-sm text-gray-600">
+                          <label
+                            htmlFor="id-upload"
+                            className="relative cursor-pointer bg-white rounded-md font-medium text-blue-800 hover:text-blue-900 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                          >
+                            <span>Upload a file</span>
+                            <input
+                              id="id-upload"
+                              {...register('idDocument', { required: 'ID document is required' })}
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="sr-only"
+                              onChange={handleIdDocumentChange}
+                            />
+                          </label>
+                          <p className="pl-1">or drag and drop</p>
+                        </div>
+                      )}
                       <p className="text-xs text-gray-500">
                         PNG, JPG, PDF up to 10MB
                       </p>
@@ -796,22 +874,51 @@ const Register: React.FC = () => {
                   <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-blue-400 transition-colors">
                     <div className="space-y-1 text-center">
                       <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="flex text-sm text-gray-600">
-                        <label
-                          htmlFor="resume-upload"
-                          className="relative cursor-pointer bg-white rounded-md font-medium text-blue-800 hover:text-blue-900 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-                        >
-                          <span>Upload a file</span>
-                          <input
-                            id="resume-upload"
-                            {...register('munResume')}
-                            type="file"
-                            accept=".pdf,.doc,.docx"
-                            className="sr-only"
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
+                      {selectedMunResume ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-center space-x-2">
+                            <Check className="h-5 w-5 text-green-500" />
+                            <span className="text-sm font-medium text-green-700">
+                              {selectedMunResume.name}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {(selectedMunResume.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                          <label
+                            htmlFor="resume-upload-change"
+                            className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                          >
+                            Change file
+                            <input
+                              id="resume-upload-change"
+                              {...register('munResume')}
+                              type="file"
+                              accept=".pdf,.doc,.docx"
+                              className="sr-only"
+                              onChange={handleMunResumeChange}
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="flex text-sm text-gray-600">
+                          <label
+                            htmlFor="resume-upload"
+                            className="relative cursor-pointer bg-white rounded-md font-medium text-blue-800 hover:text-blue-900 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                          >
+                            <span>Upload a file</span>
+                            <input
+                              id="resume-upload"
+                              {...register('munResume')}
+                              type="file"
+                              accept=".pdf,.doc,.docx"
+                              className="sr-only"
+                              onChange={handleMunResumeChange}
+                            />
+                          </label>
+                          <p className="pl-1">or drag and drop</p>
+                        </div>
+                      )}
                       <p className="text-xs text-gray-500">
                         PDF, DOC, DOCX up to 10MB
                       </p>
@@ -819,39 +926,6 @@ const Register: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Pricing Summary */}
-                {pricing && (
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-4">
-                    <h4 className="text-lg font-semibold text-blue-900 mb-4">Registration Fees</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-blue-200">
-                        <h5 className="font-medium text-blue-900 mb-2">Kumaraguru Delegate</h5>
-                        <p className="text-2xl font-bold text-blue-600">₹{pricing.internalDelegate}</p>
-                        <p className="text-sm text-gray-600">Kumaraguru students</p>
-                      </div>
-                      <div className="bg-white p-4 rounded-lg border border-blue-200">
-                        <h5 className="font-medium text-blue-900 mb-2">External Delegate</h5>
-                        <p className="text-2xl font-bold text-blue-600">₹{pricing.externalDelegate}</p>
-                        <p className="text-sm text-gray-600">Other institutions</p>
-                      </div>
-                      <div className="bg-white p-4 rounded-lg border border-blue-200">
-                        <h5 className="font-medium text-blue-900 mb-2">Accommodation</h5>
-                        <p className="text-2xl font-bold text-blue-600">₹{pricing.accommodationCharge}</p>
-                        <p className="text-sm text-gray-600">Optional 3-night stay</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-blue-200">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Early Bird Discount:</span>
-                        <span className="font-medium text-green-600">₹{pricing.earlyBirdDiscount}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Group Discount:</span>
-                        <span className="font-medium text-green-600">₹{pricing.groupDiscount} per person</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex">
@@ -968,13 +1042,22 @@ const Register: React.FC = () => {
       </div>
 
       {/* Payment Gateway Modal */}
-      {showPayment && registrationData && pricing && (
+      {(() => {
+        console.log('Payment modal conditions:', {
+          showPayment,
+          registrationData,
+          pricing,
+          allConditionsMet: showPayment && registrationData && pricing
+        });
+        return showPayment && registrationData && pricing;
+      })() && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full">
             <PaymentGateway
               userId={registrationData.userId}
               registrationId={registrationData.id}
-              amount={watch('isKumaraguru') === 'yes' ? pricing.internalDelegate : pricing.externalDelegate}
+              customUserId={registrationData.customUserId}
+              amount={watch('isKumaraguru') === 'yes' ? pricing?.internalDelegate || 0 : pricing?.externalDelegate || 0}
               currency="INR"
               onSuccess={handlePaymentSuccess}
               onFailure={handlePaymentFailure}

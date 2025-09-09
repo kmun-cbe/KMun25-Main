@@ -7,7 +7,7 @@ dotenv.config();
 
 // Prisma Client
 const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+  log: process.env.NODE_ENV === 'development' ? ['info', 'warn', 'error'] : ['error'],
 });
 
 // Test database connection
@@ -20,7 +20,7 @@ export const connectDatabase = async () => {
     return true;
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
-    console.log('💡 Using SQLite fallback database');
+    console.log('💡 Database connection failed - check your PostgreSQL configuration');
     return false;
   }
 };

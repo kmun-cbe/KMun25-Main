@@ -2,12 +2,40 @@ import paymentService from '../services/paymentService.js';
 import { prisma } from '../config/database.js';
 
 class PaymentController {
+  async testPaymentService(req, res) {
+    try {
+      const paymentService = require('../services/paymentService.js').default;
+      return res.json({
+        success: true,
+        message: 'Payment service test',
+        data: {
+          isConfigured: paymentService.isConfigured,
+          hasRazorpay: !!paymentService.razorpay
+        }
+      });
+    } catch (error) {
+      console.error('Payment service test error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service test failed',
+        error: error.message
+      });
+    }
+  }
+
   async createPaymentOrder(req, res) {
     try {
+      console.log('Payment order request:', {
+        body: req.body,
+        user: req.user,
+        headers: req.headers
+      });
+      
       const { userId, registrationId, amount, currency = 'INR' } = req.body;
 
       // Validate required fields
       if (!userId || !amount) {
+        console.log('Validation failed:', { userId, amount });
         return res.status(400).json({
           success: false,
           message: 'User ID and amount are required'
@@ -41,20 +69,27 @@ class PaymentController {
         });
       }
 
-      // Log the payment attempt
-      await prisma.activityLog.create({
-        data: {
-          userId: req.user.id,
-          action: 'CREATE_PAYMENT_ORDER',
-          details: {
-            targetUserId: userId,
-            amount,
-            currency,
-            paymentId: result.payment.id,
-            razorpayOrderId: result.razorpayOrder.id
-          }
+      // Log the payment attempt (optional - don't fail if logging fails)
+      try {
+        if (req.user && req.user.id) {
+          await prisma.activityLog.create({
+            data: {
+              userId: req.user.id,
+              action: 'CREATE_PAYMENT_ORDER',
+              details: {
+                targetUserId: userId,
+                amount,
+                currency,
+                paymentId: result.payment.id,
+                razorpayOrderId: result.razorpayOrder.id
+              }
+            }
+          });
         }
-      });
+      } catch (logError) {
+        console.warn('Failed to log payment activity:', logError);
+        // Don't fail the payment if logging fails
+      }
 
       res.json({
         success: true,
@@ -162,7 +197,7 @@ class PaymentController {
                 firstName: true,
                 lastName: true,
                 email: true,
-                institution: true
+                school: true
               }
             }
           },
@@ -208,7 +243,7 @@ class PaymentController {
               firstName: true,
               lastName: true,
               email: true,
-              institution: true,
+              school: true,
               phone: true
             }
           }
@@ -334,20 +369,16 @@ class PaymentController {
 
   async getTransactionLogs(req, res) {
     try {
-      const { page = 1, limit = 20, action, userId } = req.query;
+      const { page = 1, limit = 20, status, userId } = req.query;
       const skip = (page - 1) * limit;
 
-      const whereClause = {
-        action: {
-          in: ['CREATE_PAYMENT_ORDER', 'PAYMENT_VERIFIED', 'PAYMENT_VERIFICATION_FAILED', 'PAYMENT_REFUNDED']
-        }
-      };
-
-      if (action) whereClause.action = action;
+      const whereClause = {};
+      
+      if (status) whereClause.status = status;
       if (userId) whereClause.userId = userId;
 
       const [logs, total] = await Promise.all([
-        prisma.activityLog.findMany({
+        prisma.payment.findMany({
           where: whereClause,
           include: {
             user: {
@@ -357,13 +388,23 @@ class PaymentController {
                 lastName: true,
                 email: true
               }
+            },
+            registration: {
+              select: {
+                id: true,
+                committee: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
             }
           },
           orderBy: { createdAt: 'desc' },
           skip: parseInt(skip),
           take: parseInt(limit)
         }),
-        prisma.activityLog.count({ where: whereClause })
+        prisma.payment.count({ where: whereClause })
       ]);
 
       res.json({

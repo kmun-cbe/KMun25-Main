@@ -1,7 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
 
 export const authenticateToken = async (req, res, next) => {
   try {
@@ -29,7 +27,7 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     req.user = {
-      userId: user.id,
+      id: user.id,
       email: user.email,
       role: user.role,
       firstName: user.firstName,
@@ -79,7 +77,7 @@ export const optionalAuth = async (req, res, next) => {
 
       if (user && user.isActive) {
         req.user = {
-          userId: user.id,
+          id: user.id,
           email: user.email,
           role: user.role,
           firstName: user.firstName,

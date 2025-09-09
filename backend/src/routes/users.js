@@ -1,11 +1,11 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import emailService from '../services/emailService.js';
+import userIdService from '../services/userIdService.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get all users
 router.get('/', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMIN'), async (req, res) => {
@@ -13,12 +13,11 @@ router.get('/', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMIN')
     const users = await prisma.user.findMany({
       select: {
         id: true,
-        userId: true,
         firstName: true,
         lastName: true,
         email: true,
         phone: true,
-        institution: true,
+        school: true,
         grade: true,
         role: true,
         isActive: true,
@@ -52,7 +51,7 @@ router.post('/', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMIN'
       lastName,
       email,
       phone,
-      institution,
+      school,
       grade,
       role,
       password
@@ -70,17 +69,21 @@ router.post('/', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMIN'
       });
     }
 
+    // Generate custom user ID
+    const customUserId = await userIdService.generateUserId();
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Create user
     const user = await prisma.user.create({
       data: {
+        userId: customUserId,
         firstName,
         lastName,
         email,
         phone,
-        institution,
+        school,
         grade,
         role: role || 'PARTICIPANT',
         password: hashedPassword,
@@ -88,11 +91,12 @@ router.post('/', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMIN'
       },
       select: {
         id: true,
+        userId: true,
         firstName: true,
         lastName: true,
         email: true,
         phone: true,
-        institution: true,
+        school: true,
         grade: true,
         role: true,
         isActive: true,
@@ -136,12 +140,11 @@ router.get('/:id', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMI
       where: { id: req.params.id },
       select: {
         id: true,
-        userId: true,
         firstName: true,
         lastName: true,
         email: true,
         phone: true,
-        institution: true,
+        school: true,
         grade: true,
         role: true,
         isActive: true,
@@ -175,14 +178,14 @@ router.get('/:id', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMI
 // Update user
 router.put('/:id', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMIN'), async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, institution, grade, role, isActive, password } = req.body;
+    const { firstName, lastName, email, phone, school, grade, role, isActive, password } = req.body;
     
     const updateData = {
       firstName,
       lastName,
       email,
       phone,
-      institution,
+      school,
       grade,
       role,
       isActive,
@@ -203,7 +206,7 @@ router.put('/:id', authenticateToken, authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMI
         lastName: true,
         email: true,
         phone: true,
-        institution: true,
+        school: true,
         grade: true,
         role: true,
         isActive: true,

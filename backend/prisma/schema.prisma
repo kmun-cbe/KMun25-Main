@@ -3,12 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id                String    @id @default(cuid())
+  userId            String    @unique // Custom KMUN25XXX format
   email             String    @unique
   password          String
   firstName         String
@@ -271,18 +272,18 @@ model EmailTemplate {
   @@map("email_templates")
 }
 
-// UserRole enum replaced with String for SQLite compatibility
+// UserRole enum replaced with String for compatibility
 // Valid values: DELEGATE, COMMITTEE_DIRECTOR, DELEGATE_AFFAIRS, HOSPITALITY_ADMIN, 
 // FRONT_DESK_ADMIN, DEV_ADMIN, SOFTWARE_ADMIN, REGISTRATION_ADMIN, 
 // ALLOCATION_ADMIN, EXECUTIVE_BOARD, PARTICIPANT
 
-// RegistrationStatus enum replaced with String for SQLite compatibility
+// RegistrationStatus enum replaced with String for compatibility
 // Valid values: PENDING, APPROVED, REJECTED, WAITLISTED
 
-// PaymentStatus enum replaced with String for SQLite compatibility
+// PaymentStatus enum replaced with String for compatibility
 // Valid values: PENDING, COMPLETED, FAILED, REFUNDED
 
-// AttendanceStatus enum replaced with String for SQLite compatibility
+// AttendanceStatus enum replaced with String for compatibility
 // Valid values: PRESENT, ABSENT, LATE, EXCUSED
 
 model GalleryItem {

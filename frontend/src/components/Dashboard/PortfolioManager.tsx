@@ -14,9 +14,10 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
-import { committeesAPI } from '../../services/api';
+import { committeesAPI } from '@/services/api';
 import toast from 'react-hot-toast';
-import { useFormOpenScroll } from '../../hooks/useScrollToTop';
+import { useFormOpenScroll } from '@/hooks/useScrollToTop';
+import { useAuth } from '@/context/AuthContext';
 
 interface Committee {
   id: string;
@@ -37,6 +38,7 @@ interface Portfolio {
 }
 
 const PortfolioManager: React.FC = () => {
+  const { user } = useAuth();
   const [committees, setCommittees] = useState<Committee[]>([]);
   const [selectedCommittee, setSelectedCommittee] = useState<Committee | null>(null);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
@@ -119,8 +121,24 @@ const PortfolioManager: React.FC = () => {
       return;
     }
 
+    // Check if user has permission to add portfolios
+    if (user?.role !== 'DEV_ADMIN') {
+      toast.error('You do not have permission to add portfolios. Only Dev Admins can perform this action.');
+      return;
+    }
+
     if (!formData.name.trim()) {
       toast.error('Please enter a portfolio name');
+      return;
+    }
+
+    if (formData.name.trim().length < 3) {
+      toast.error('Portfolio name must be at least 3 characters long');
+      return;
+    }
+
+    if (formData.name.trim().length > 100) {
+      toast.error('Portfolio name must be less than 100 characters');
       return;
     }
 
@@ -132,14 +150,34 @@ const PortfolioManager: React.FC = () => {
 
       if (response.success) {
         toast.success('Portfolio added successfully');
-        fetchCommittees(); // Refresh to get updated data
+        
+        // Update local state immediately for real-time UI update
+        const newPortfolio = response.data;
+        console.log('New portfolio added:', newPortfolio);
+        if (newPortfolio && selectedCommittee) {
+          const updatedPortfolios = [...portfolios, newPortfolio];
+          console.log('Updated portfolios:', updatedPortfolios);
+          setPortfolios(updatedPortfolios);
+          
+          // Update the selected committee in the committees array
+          const updatedCommittees = committees.map(committee => 
+            committee.id === selectedCommittee.id 
+              ? { ...committee, portfolios: updatedPortfolios }
+              : committee
+          );
+          setCommittees(updatedCommittees);
+          setSelectedCommittee({ ...selectedCommittee, portfolios: updatedPortfolios });
+          console.log('Updated selected committee:', { ...selectedCommittee, portfolios: updatedPortfolios });
+        }
+        
         resetForm();
       } else {
         throw new Error(response.message || 'Failed to add portfolio');
       }
     } catch (error) {
       console.error('Error adding portfolio:', error);
-      toast.error('Failed to add portfolio');
+      const errorMessage = error.message || 'Failed to add portfolio';
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -153,8 +191,24 @@ const PortfolioManager: React.FC = () => {
       return;
     }
 
+    // Check if user has permission to update portfolios
+    if (user?.role !== 'DEV_ADMIN') {
+      toast.error('You do not have permission to update portfolios. Only Dev Admins can perform this action.');
+      return;
+    }
+
     if (!formData.name.trim()) {
       toast.error('Please enter a portfolio name');
+      return;
+    }
+
+    if (formData.name.trim().length < 3) {
+      toast.error('Portfolio name must be at least 3 characters long');
+      return;
+    }
+
+    if (formData.name.trim().length > 100) {
+      toast.error('Portfolio name must be less than 100 characters');
       return;
     }
 
@@ -170,14 +224,35 @@ const PortfolioManager: React.FC = () => {
 
       if (response.success) {
         toast.success('Portfolio updated successfully');
-        fetchCommittees(); // Refresh to get updated data
+        
+        // Update local state immediately for real-time UI update
+        const updatedPortfolio = response.data;
+        if (updatedPortfolio && selectedCommittee) {
+          const updatedPortfolios = portfolios.map(portfolio => 
+            portfolio.id === editingPortfolio.id 
+              ? { ...portfolio, name: updatedPortfolio.name }
+              : portfolio
+          );
+          setPortfolios(updatedPortfolios);
+          
+          // Update the selected committee in the committees array
+          const updatedCommittees = committees.map(committee => 
+            committee.id === selectedCommittee.id 
+              ? { ...committee, portfolios: updatedPortfolios }
+              : committee
+          );
+          setCommittees(updatedCommittees);
+          setSelectedCommittee({ ...selectedCommittee, portfolios: updatedPortfolios });
+        }
+        
         resetForm();
       } else {
         throw new Error(response.message || 'Failed to update portfolio');
       }
     } catch (error) {
       console.error('Error updating portfolio:', error);
-      toast.error('Failed to update portfolio');
+      const errorMessage = error.message || 'Failed to update portfolio';
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -186,6 +261,12 @@ const PortfolioManager: React.FC = () => {
   const handleDeletePortfolio = async (portfolioId: string) => {
     if (!selectedCommittee) {
       toast.error('No committee selected');
+      return;
+    }
+
+    // Check if user has permission to delete portfolios
+    if (user?.role !== 'DEV_ADMIN') {
+      toast.error('You do not have permission to delete portfolios. Only Dev Admins can perform this action.');
       return;
     }
 
@@ -199,7 +280,21 @@ const PortfolioManager: React.FC = () => {
 
       if (response.success) {
         toast.success('Portfolio deleted successfully');
-        fetchCommittees(); // Refresh to get updated data
+        
+        // Update local state immediately for real-time UI update
+        if (selectedCommittee) {
+          const updatedPortfolios = portfolios.filter(portfolio => portfolio.id !== portfolioId);
+          setPortfolios(updatedPortfolios);
+          
+          // Update the selected committee in the committees array
+          const updatedCommittees = committees.map(committee => 
+            committee.id === selectedCommittee.id 
+              ? { ...committee, portfolios: updatedPortfolios }
+              : committee
+          );
+          setCommittees(updatedCommittees);
+          setSelectedCommittee({ ...selectedCommittee, portfolios: updatedPortfolios });
+        }
       }
     } catch (error) {
       console.error('Error deleting portfolio:', error);

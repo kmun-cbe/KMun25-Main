@@ -1,10 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import fileUploadService from '../services/fileUploadService.js';
 import emailService from '../services/emailService.js';
 import paymentService from '../services/paymentService.js';
-
-const prisma = new PrismaClient();
+import userIdService from '../services/userIdService.js';
 
 class RegistrationController {
   async createRegistration(req, res) {
@@ -50,12 +50,17 @@ class RegistrationController {
         });
       }
 
+      // Generate custom user ID
+      const customUserId = await userIdService.generateUserId();
+      console.log('Generated custom user ID:', customUserId);
+
       // Create user account first
       const userPassword = `Iam${firstName}1!@#`;
       const hashedPassword = await bcrypt.hash(userPassword, 12);
 
       const user = await prisma.user.create({
         data: {
+          userId: customUserId,
           firstName,
           lastName,
           email,
@@ -94,6 +99,13 @@ class RegistrationController {
         },
       });
 
+      // Generate JWT token for immediate authentication
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
       // Send registration confirmation email using Outlook SMTP
       await emailService.sendRegistrationConfirmation(email, {
         firstName,
@@ -116,9 +128,11 @@ class RegistrationController {
         },
         user: {
           id: user.id,
+          userId: user.userId,
           email: user.email,
           tempPassword: userPassword,
         },
+        token, // Include JWT token for immediate authentication
       });
     } catch (error) {
       console.error('Registration error:', error);
@@ -139,11 +153,14 @@ class RegistrationController {
         paymentStatus,
         search,
         sortBy = 'submittedAt',
-        sortOrder = 'DESC',
+        sortOrder = 'desc',
       } = req.query;
 
       const offset = (page - 1) * limit;
       const where = {};
+
+      // Normalize sort order to lowercase (Prisma expects 'asc' or 'desc')
+      const normalizedSortOrder = sortOrder.toLowerCase() === 'asc' ? 'asc' : 'desc';
 
       // Apply filters
       if (status) where.status = status;
@@ -174,7 +191,7 @@ class RegistrationController {
           skip: offset,
           take: parseInt(limit),
           orderBy: {
-            [sortBy]: sortOrder,
+            [sortBy]: normalizedSortOrder,
           },
         }),
         prisma.registrationForm.count({ where }),

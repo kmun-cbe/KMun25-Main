@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { paymentsAPI } from '../../services/api';
+import { paymentsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 
 interface PaymentGatewayProps {
   userId: string;
   registrationId?: string;
+  customUserId?: string;
   amount: number;
   currency?: string;
   onSuccess?: (paymentData: any) => void;
@@ -21,6 +22,7 @@ declare global {
 const PaymentGateway: React.FC<PaymentGatewayProps> = ({
   userId,
   registrationId,
+  customUserId,
   amount,
   currency = 'INR',
   onSuccess,
@@ -57,6 +59,10 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
   }, []);
 
   const handlePayment = async () => {
+    console.log('Payment button clicked');
+    console.log('Razorpay loaded:', razorpayLoaded);
+    console.log('Payment data:', { userId, registrationId, amount, currency });
+    
     if (!razorpayLoaded) {
       toast.error('Payment gateway is still loading. Please try again.');
       return;
@@ -116,7 +122,8 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
         },
         notes: {
           registrationId: registrationId || '',
-          userId: userId
+          userId: userId,
+          customUserId: customUserId || ''
         },
         theme: {
           color: '#172d9d'
@@ -159,16 +166,17 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
           <span className="font-semibold text-gray-900">{currency}</span>
         </div>
 
-        {registrationId && (
+        {customUserId && (
           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-            <span className="text-gray-700">Registration ID</span>
-            <span className="font-semibold text-gray-900">{registrationId}</span>
+            <span className="text-gray-700">User ID</span>
+            <span className="font-semibold text-gray-900">{customUserId}</span>
           </div>
         )}
       </div>
 
       <div className="space-y-3">
         <button
+          type="button"
           onClick={handlePayment}
           disabled={loading || !razorpayLoaded}
           className="w-full bg-[#172d9d] text-white py-3 px-4 rounded-lg hover:bg-[#1a2a8a] focus:outline-none focus:ring-2 focus:ring-[#172d9d] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -185,6 +193,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
 
         {onClose && (
           <button
+            type="button"
             onClick={onClose}
             className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
           >

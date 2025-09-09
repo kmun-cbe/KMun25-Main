@@ -1,5 +1,5 @@
 // API service for backend communication
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://backend-7rnp.onrender.com').replace(/\/api\/?$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_URL);
 
 // Helper function to get auth token
 const getAuthToken = () => {
@@ -129,17 +129,55 @@ export const committeesAPI = {
   },
 
   create: async (data: any) => {
-    return authenticatedFetch('/api/committees', {
+    const token = getAuthToken();
+    const isFormData = data instanceof FormData;
+    
+    const headers: Record<string, string> = {
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+    };
+    
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/committees`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      headers,
+      body: isFormData ? data : JSON.stringify(data),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
   },
 
   update: async (id: string, data: any) => {
-    return authenticatedFetch(`/api/committees/${id}`, {
+    const token = getAuthToken();
+    const isFormData = data instanceof FormData;
+    
+    const headers: Record<string, string> = {
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+    };
+    
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/committees/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      headers,
+      body: isFormData ? data : JSON.stringify(data),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
   },
 
   delete: async (id: string) => {
@@ -219,7 +257,11 @@ export const usersAPI = {
 // Pricing API
 export const pricingAPI = {
   get: async () => {
-    return authenticatedFetch('/api/pricing');
+    const response = await fetch(`${API_BASE_URL}/api/pricing`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
   },
 
   update: async (data: any) => {
