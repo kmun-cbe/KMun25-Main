@@ -11,7 +11,7 @@ interface Committee {
   registered: number;
   topics: string[];
   chairs: string[];
-  image: string;
+  logo?: string;
 }
 
 const Committees: React.FC = () => {
@@ -83,7 +83,26 @@ const Committees: React.FC = () => {
                 <div className="p-8">
                   <div className="flex items-start justify-between mb-6">
                     <div className="flex items-center gap-4">
-                      <div className="text-4xl">🏛️</div>
+                      {committee.logo ? (
+                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+                          <img 
+                            src={committee.logo} 
+                            alt={`${committee.name} logo`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to emoji if image fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = '<div class="text-4xl">🏛️</div>';
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-4xl">🏛️</div>
+                      )}
                       <div>
                         <h3 className="text-xl font-bold text-gray-900">{committee.name}</h3>
                       </div>
@@ -114,87 +133,6 @@ const Committees: React.FC = () => {
                 </div>
               </motion.div>
             ))}
-            
-            {/* Additional Committee Blocks */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: committees.length * 0.1 }}
-              className="bg-white rounded-lg shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-300"
-            >
-              <div className="p-8">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="text-4xl">🏛️</div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Additional Committee 1</h3>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Description</h4>
-                    <p className="text-gray-600">Committee description to be announced.</p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Agenda</h4>
-                    <ul className="list-disc list-inside text-gray-600 space-y-1">
-                      <li>To be Announced</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-6 border-t border-gray-200">
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <div>
-                      <span>Chairs: To be Announced</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: (committees.length + 1) * 0.1 }}
-              className="bg-white rounded-lg shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-300"
-            >
-              <div className="p-8">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="text-4xl">🏛️</div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Additional Committee 2</h3>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Description</h4>
-                    <p className="text-gray-600">Committee description to be announced.</p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Agenda</h4>
-                    <ul className="list-disc list-inside text-gray-600 space-y-1">
-                      <li>To be Announced</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-6 border-t border-gray-200">
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <div>
-                      <span>Chairs: To be Announced</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
           </div>
         </div>
       </section>

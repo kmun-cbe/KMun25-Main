@@ -96,6 +96,10 @@ export const registrationAPI = {
     return authenticatedFetch(`/api/registrations/${id}`);
   },
 
+  getMyRegistration: async () => {
+    return authenticatedFetch('/api/registrations/my-registration');
+  },
+
   update: async (id: string, data: any) => {
     return authenticatedFetch(`/api/registrations/${id}`, {
       method: 'PUT',
@@ -480,29 +484,33 @@ export const galleryAPI = {
     return authenticatedFetch('/api/gallery/categories');
   },
 
-  create: async (data: {
+  create: async (data: FormData | {
     title: string;
     type: 'image' | 'video';
     imageUrl: string;
     videoUrl?: string;
     category: string;
   }) => {
+    const isFormData = data instanceof FormData;
     return authenticatedFetch('/api/gallery', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: isFormData ? data : JSON.stringify(data),
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
     });
   },
 
-  update: async (id: string, data: {
+  update: async (id: string, data: FormData | {
     title?: string;
     type?: 'image' | 'video';
     imageUrl?: string;
     videoUrl?: string;
     category?: string;
   }) => {
+    const isFormData = data instanceof FormData;
     return authenticatedFetch(`/api/gallery/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: isFormData ? data : JSON.stringify(data),
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
     });
   },
 

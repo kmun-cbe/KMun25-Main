@@ -7,6 +7,24 @@ import paymentService from '../services/paymentService.js';
 import userIdService from '../services/userIdService.js';
 
 class RegistrationController {
+  async testConnection(req, res) {
+    try {
+      const count = await prisma.registrationForm.count();
+      res.json({
+        success: true,
+        message: 'Database connection successful',
+        count: count
+      });
+    } catch (error) {
+      console.error('Database connection test error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Database connection failed',
+        error: error.message
+      });
+    }
+  }
+
   async createRegistration(req, res) {
     try {
       const {
@@ -146,15 +164,22 @@ class RegistrationController {
 
   async getRegistrations(req, res) {
     try {
+      console.log('Starting getRegistrations...');
+      
+      // First, test basic database connection
+      const totalCount = await prisma.registrationForm.count();
+      console.log(`Total registrations in database: ${totalCount}`);
+
       const {
         page = 1,
         limit = 10,
         status,
-        paymentStatus,
         search,
         sortBy = 'submittedAt',
         sortOrder = 'desc',
       } = req.query;
+
+      console.log('Get registrations query params:', { page, limit, status, search, sortBy, sortOrder });
 
       const offset = (page - 1) * limit;
       const where = {};
@@ -164,43 +189,55 @@ class RegistrationController {
 
       // Apply filters
       if (status) where.status = status;
-      if (paymentStatus) where.paymentStatus = paymentStatus;
       if (search) {
-        where[Op.or] = [
-          { firstName: { [Op.iLike]: `%${search}%` } },
-          { lastName: { [Op.iLike]: `%${search}%` } },
-          { email: { [Op.iLike]: `%${search}%` } },
-          { institution: { [Op.iLike]: `%${search}%` } },
+        where.OR = [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { institution: { contains: search, mode: 'insensitive' } },
         ];
       }
 
-      const [registrations, total] = await Promise.all([
-        prisma.registrationForm.findMany({
-          where,
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
-              },
-            },
-          },
-          skip: offset,
-          take: parseInt(limit),
-          orderBy: {
-            [sortBy]: normalizedSortOrder,
-          },
-        }),
-        prisma.registrationForm.count({ where }),
-      ]);
+      console.log('Where clause:', where);
+
+      // Validate sortBy field
+      const validSortFields = ['submittedAt', 'createdAt', 'updatedAt', 'firstName', 'lastName', 'email', 'status'];
+      const finalSortBy = validSortFields.includes(sortBy) ? sortBy : 'submittedAt';
+
+      // Get registrations with simple query first
+      const registrations = await prisma.registrationForm.findMany({
+        where,
+        skip: offset,
+        take: parseInt(limit),
+        orderBy: {
+          [finalSortBy]: normalizedSortOrder,
+        },
+      });
+
+      console.log(`Found ${registrations.length} registrations`);
+
+      // Get total count
+      const total = await prisma.registrationForm.count({ where });
+
+      // Add user data to each registration
+      const registrationsWithUsers = registrations.map(registration => ({
+        ...registration,
+        user: {
+          id: registration.userId,
+          firstName: registration.firstName,
+          lastName: registration.lastName,
+          email: registration.email,
+          phone: registration.phone,
+          userId: null, // This would need to be fetched separately if needed
+        }
+      }));
+
+      console.log(`Returning ${registrationsWithUsers.length} registrations with user data`);
 
       res.json({
         success: true,
         data: {
-          registrations,
+          registrations: registrationsWithUsers,
           pagination: {
             total,
             page: parseInt(page),
@@ -211,9 +248,54 @@ class RegistrationController {
       });
     } catch (error) {
       console.error('Get registrations error:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({
         success: false,
         message: 'Failed to get registrations',
+        error: error.message,
+      });
+    }
+  }
+
+  async getMyRegistration(req, res) {
+    try {
+      const userId = req.user.id;
+
+      const registration = await prisma.registrationForm.findFirst({
+        where: { userId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              userId: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (!registration) {
+        return res.status(404).json({
+          success: false,
+          message: 'No registration found for this user',
+        });
+      }
+
+      res.json({
+        success: true,
+        registration,
+      });
+    } catch (error) {
+      console.error('Get my registration error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get registration',
         error: error.message,
       });
     }
@@ -223,7 +305,7 @@ class RegistrationController {
     try {
       const { id } = req.params;
 
-      const registration = await prisma.registration.findUnique({
+      const registration = await prisma.registrationForm.findUnique({
         where: { id },
         include: {
           user: {
@@ -264,7 +346,7 @@ class RegistrationController {
       const { id } = req.params;
       const { status, allocatedCommittee, allocatedPortfolio } = req.body;
 
-      const registration = await prisma.registration.findUnique({
+      const registration = await prisma.registrationForm.findUnique({
         where: { id },
         include: { user: true },
       });
@@ -276,7 +358,7 @@ class RegistrationController {
         });
       }
 
-      const updatedRegistration = await prisma.registration.update({
+      const updatedRegistration = await prisma.registrationForm.update({
         where: { id },
         data: {
           status,
@@ -315,7 +397,7 @@ class RegistrationController {
     try {
       const { id } = req.params;
 
-      const registration = await prisma.registration.findUnique({
+      const registration = await prisma.registrationForm.findUnique({
         where: { id },
       });
       
@@ -334,7 +416,7 @@ class RegistrationController {
         await fileUploadService.deleteFile(registration.munResume);
       }
 
-      await prisma.registration.delete({
+      await prisma.registrationForm.delete({
         where: { id },
       });
 
@@ -354,21 +436,18 @@ class RegistrationController {
 
   async getRegistrationStats(req, res) {
     try {
-      const stats = await prisma.registration.groupBy({
-        by: ['status', 'paymentStatus'],
+      const stats = await prisma.registrationForm.groupBy({
+        by: ['status'],
         _count: {
           id: true,
         },
       });
 
-      const totalRegistrations = await prisma.registration.count();
-      const confirmedRegistrations = await prisma.registration.count({
+      const totalRegistrations = await prisma.registrationForm.count();
+      const confirmedRegistrations = await prisma.registrationForm.count({
         where: { status: 'CONFIRMED' },
       });
-      const paidRegistrations = await prisma.registration.count({
-        where: { paymentStatus: 'PAID' },
-      });
-      const allocatedRegistrations = await prisma.registration.count({
+      const allocatedRegistrations = await prisma.registrationForm.count({
         where: {
           allocatedCommittee: { not: null },
           allocatedPortfolio: { not: null },
@@ -380,7 +459,6 @@ class RegistrationController {
         stats: {
           total: totalRegistrations,
           confirmed: confirmedRegistrations,
-          paid: paidRegistrations,
           allocated: allocatedRegistrations,
           byStatus: stats,
         },

@@ -30,6 +30,8 @@ const uploadMiddleware = fileUploadService.documentUpload.fields([
 ]);
 
 // Routes
+router.get('/test', registrationController.testConnection);
+
 router.post(
   '/',
   uploadMiddleware,
@@ -43,6 +45,12 @@ router.get(
   authenticateToken,
   authorizeRoles('DEV_ADMIN', 'SOFTWARE_ADMIN', 'SUPER_ADMIN', 'REGISTRATION_ADMIN'),
   registrationController.getRegistrations
+);
+
+router.get(
+  '/my-registration',
+  authenticateToken,
+  registrationController.getMyRegistration
 );
 
 router.get(
