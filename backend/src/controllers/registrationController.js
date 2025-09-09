@@ -27,6 +27,9 @@ class RegistrationController {
 
   async createRegistration(req, res) {
     try {
+      console.log('Registration request body:', req.body);
+      console.log('Registration request files:', req.files);
+
       const {
         fullName,
         email,
@@ -42,23 +45,26 @@ class RegistrationController {
         totalMuns,
         requiresAccommodation,
         committeePreference1,
-        portfolioPreference1_1,
-        portfolioPreference1_2,
-        portfolioPreference1_3,
+        portfolioPreference1,
         committeePreference2,
-        portfolioPreference2_1,
-        portfolioPreference2_2,
-        portfolioPreference2_3,
+        portfolioPreference2,
         committeePreference3,
-        portfolioPreference3_1,
-        portfolioPreference3_2,
-        portfolioPreference3_3,
+        portfolioPreference3,
       } = req.body;
 
       // Split fullName into firstName and lastName
       const nameParts = fullName.trim().split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Validate required fields
+      if (!fullName || !email || !phone || !gender || !committeePreference1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required fields',
+          required: ['fullName', 'email', 'phone', 'gender', 'committeePreference1']
+        });
+      }
 
       // Validate required files
       if (!req.files || !req.files.idDocument) {
@@ -107,11 +113,11 @@ class RegistrationController {
           totalMuns: parseInt(totalMuns) || 0,
           requiresAccommodation: requiresAccommodation === 'yes',
           committeePreference1,
-          portfolioPreference1: portfolioPreference1_1,
+          portfolioPreference1: portfolioPreference1 || '',
           committeePreference2,
-          portfolioPreference2: portfolioPreference2_1,
+          portfolioPreference2: portfolioPreference2 || '',
           committeePreference3,
-          portfolioPreference3: portfolioPreference3_1,
+          portfolioPreference3: portfolioPreference3 || '',
           idDocument: req.files.idDocument[0].path,
           munResume: req.files.munResume ? req.files.munResume[0].path : null,
         },
@@ -165,6 +171,16 @@ class RegistrationController {
   async getRegistrations(req, res) {
     try {
       console.log('Starting getRegistrations...');
+      console.log('Request headers:', req.headers);
+      console.log('Request user:', req.user);
+      
+      // Check if user is authenticated
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
+      }
       
       // First, test basic database connection
       const totalCount = await prisma.registrationForm.count();
@@ -234,7 +250,7 @@ class RegistrationController {
 
       console.log(`Returning ${registrationsWithUsers.length} registrations with user data`);
 
-      res.json({
+      res.status(200).json({
         success: true,
         data: {
           registrations: registrationsWithUsers,
@@ -253,6 +269,7 @@ class RegistrationController {
         success: false,
         message: 'Failed to get registrations',
         error: error.message,
+        timestamp: new Date().toISOString(),
       });
     }
   }
