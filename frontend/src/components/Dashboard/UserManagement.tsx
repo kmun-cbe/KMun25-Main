@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { 
   Users, 
-  Plus, 
   Edit, 
   Trash2, 
   Search, 
-  Filter,
   RefreshCw,
   Save,
   X,
@@ -14,12 +11,10 @@ import {
   EyeOff,
   Lock,
   Unlock,
-  Mail,
   UserPlus,
   Shield,
   AlertCircle,
-  CheckCircle,
-  Clock
+  CheckCircle
 } from 'lucide-react';
 import { usersAPI } from '@/services/api';
 import toast from 'react-hot-toast';
@@ -48,7 +43,6 @@ interface UserFormData {
   institution: string;
   grade: string;
   role: string;
-  password: string;
 }
 
 const UserManagement: React.FC = () => {
@@ -71,8 +65,7 @@ const UserManagement: React.FC = () => {
     phone: '',
     institution: '',
     grade: '',
-    role: 'PARTICIPANT',
-    password: ''
+    role: 'DELEGATE'
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -81,7 +74,6 @@ const UserManagement: React.FC = () => {
   });
 
   const roles = [
-    'PARTICIPANT',
     'DELEGATE',
     'COMMITTEE_DIRECTOR',
     'DELEGATE_AFFAIRS',
@@ -112,7 +104,7 @@ const UserManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error(`Failed to load users: ${error.message}`);
+      toast.error(`Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -140,8 +132,7 @@ const UserManagement: React.FC = () => {
       phone: '',
       institution: '',
       grade: '',
-      role: 'PARTICIPANT',
-      password: ''
+      role: 'DELEGATE'
     });
     setShowAddForm(false);
     setShowEditForm(false);
@@ -160,15 +151,12 @@ const UserManagement: React.FC = () => {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.phone.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    if (!formData.password.trim()) {
-      toast.error('Password is required');
-      return;
-    }
+    // Password is auto-generated, no validation needed
 
     try {
       setSaving(true);
@@ -183,7 +171,7 @@ const UserManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      toast.error(`Failed to create user: ${error.message}`);
+      toast.error(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -198,8 +186,7 @@ const UserManagement: React.FC = () => {
       phone: user.phone || '',
       institution: user.institution || '',
       grade: user.grade || '',
-      role: user.role,
-      password: ''
+      role: user.role
     });
     setShowEditForm(true);
   };
@@ -220,9 +207,6 @@ const UserManagement: React.FC = () => {
     try {
       setSaving(true);
       const updateData = { ...formData };
-      if (!updateData.password.trim()) {
-        delete updateData.password; // Don't update password if empty
-      }
       
       const response = await usersAPI.update(editingUser.id, updateData);
 
@@ -235,14 +219,14 @@ const UserManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error(`Failed to update user: ${error.message}`);
+      toast.error(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to deactivate this user? They will be blocked from accessing the system.')) {
+    if (!confirm('⚠️ WARNING: This will permanently delete the user and ALL their data including registrations, payments, attendance records, and activity logs. This action cannot be undone. Are you sure you want to proceed?')) {
       return;
     }
 
@@ -251,14 +235,14 @@ const UserManagement: React.FC = () => {
       const response = await usersAPI.delete(userId);
 
       if (response.success) {
-        toast.success('User deactivated successfully');
+        toast.success('User and all related data deleted successfully');
         fetchUsers();
       } else {
-        throw new Error(response.message || 'Failed to deactivate user');
+        throw new Error(response.message || 'Failed to delete user');
       }
     } catch (error) {
-      console.error('Error deactivating user:', error);
-      toast.error(`Failed to deactivate user: ${error.message}`);
+      console.error('Error deleting user:', error);
+      toast.error(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -279,7 +263,7 @@ const UserManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating user status:', error);
-      toast.error(`Failed to update user status: ${error.message}`);
+      toast.error(`Failed to update user status: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -320,7 +304,7 @@ const UserManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating password:', error);
-      toast.error(`Failed to update password: ${error.message}`);
+      toast.error(`Failed to update password: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -343,7 +327,6 @@ const UserManagement: React.FC = () => {
 
   const getRoleColor = (role: string) => {
     const colors: { [key: string]: string } = {
-      'PARTICIPANT': 'bg-blue-100 text-blue-800',
       'DELEGATE': 'bg-green-100 text-green-800',
       'COMMITTEE_DIRECTOR': 'bg-purple-100 text-purple-800',
       'DELEGATE_AFFAIRS': 'bg-orange-100 text-orange-800',
@@ -607,10 +590,10 @@ const UserManagement: React.FC = () => {
                       <button
                         onClick={() => handleDeleteUser(user.id)}
                         className="text-red-600 hover:text-red-900 transition-colors flex items-center"
-                        title="Deactivate user"
+                        title="Permanently delete user and all data"
                       >
                         <Trash2 className="w-4 h-4 mr-1" />
-                        Deactivate
+                        Delete
                       </button>
                     </div>
                   </td>
@@ -687,7 +670,7 @@ const UserManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone
+                      Phone *
                     </label>
                     <input
                       type="tel"
@@ -738,25 +721,18 @@ const UserManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#172d9d] focus:border-transparent"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700">
+                        <strong>Password will be auto-generated:</strong> Iam&lt;phone number&gt;!@#
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -846,7 +822,7 @@ const UserManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone
+                      Phone *
                     </label>
                     <input
                       type="tel"
@@ -897,24 +873,18 @@ const UserManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    New Password (leave empty to keep current)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#172d9d] focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-yellow-700">
+                        <strong>Password:</strong> Use the "Change Password" button to update the user's password.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
